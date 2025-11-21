@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Stars 管理器</title>
+
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+    <!-- Axios CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <style>
+        .glass-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            border-radius: 10px;
+        }
+
+        .glass-button {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px 0 rgba(31, 38, 135, 0.1);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .glass-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 6px 25px 0 rgba(31, 38, 135, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .glass-button:active {
+            transform: translateY(0);
+        }
+
+        .glass-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 2px solid white;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 0;
+            /* 移除右边距 */
+            flex-shrink: 0;
+            /* 防止压缩 */
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .progress-bar {
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4F46E5, #7C3AED);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        /* 添加line-clamp样式支持 */
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* 活动筛选按钮样式 */
+        .filter-active {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        /* 树形结构样式 */
+        .tree-node {
+            position: relative;
+            padding-left: 1rem;
+        }
+
+        .tree-node::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .tree-node::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 1rem;
+            width: 0.5rem;
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 减少分类列表间距 */
+        .category-list {
+            margin-top: 0.25rem;
+        }
+
+        .category-list li {
+            margin-bottom: 0.1rem;
+        }
+
+        .category-button {
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+            font-size: 0.875rem;
+        }
+
+        /* Toast 组件样式 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 300px;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background-color: rgba(72, 187, 120, 0.9);
+            color: white;
+        }
+
+        .toast.error {
+            background-color: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .toast.info {
+            background-color: rgba(59, 130, 246, 0.9);
+            color: white;
+        }
+
+        .toast .toast-icon {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+
+        .toast .toast-message {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .toast .toast-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 10px;
+        }
+
+        /* 加载动画 */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen">
+    <div id="app" class="flex flex-col h-screen">
+        <!-- Toast容器 -->
+        <div class="toast-container">
+            <div v-for="(toast, index) in toasts" :key="index" :class="['toast', toast.type, { show: toast.show }]">
+                <span class="toast-icon">[[ getToastIcon(toast.type) ]]</span>
+                <span class="toast-message">[[ toast.message ]]</span>
+                <button class="toast-close" @click="removeToast(index)">&times;</button>
+            </div>
+        </div>
+
+        <!-- 移动端筛选抽屉 -->
+        <div v-if="showMobileFilter" class="fixed inset-0 z-50 md:hidden">
+            <div class="absolute inset-0 bg-black bg-opacity-50" @click="showMobileFilter = false"></div>
+            <div
+                class="absolute left-0 top-0 bottom-0 w-4/5 max-w-sm bg-gradient-to-b from-purple-600 to-indigo-700 shadow-2xl flex flex-col">
+                <div class="px-4 pt-4 flex-shrink-0">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-white text-xl font-semibold">筛选</h2>
+                        <button @click="showMobileFilter = false" class="text-white text-2xl">&times;</button>
+                    </div>
+
+                    <!-- 移动端搜索框 -->
+                    <div class="mb-4">
+                        <div class="glass-button flex items-center">
+                            <input type="text" placeholder="搜索仓库..." v-model="searchQuery" @input="resetPage()"
+                                class="flex-grow bg-transparent text-white px-3 py-2 text-sm placeholder-white/70 focus:outline-none">
+                            <button @click="showMobileFilter = false" class="text-white px-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                    fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                        d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 移动端Tab切换 -->
+                    <div class="flex border-b border-white/20">
+                        <button @click="activeTab = 'categories'"
+                            :class="{'border-b-2 border-white text-white': activeTab === 'categories', 'text-white/70': activeTab !== 'categories'}"
+                            class="px-3 py-2 text-sm font-medium focus:outline-none">
+                            分类
+                        </button>
+                        <button @click="activeTab = 'tags'"
+                            :class="{'border-b-2 border-white text-white': activeTab === 'tags', 'text-white/70': activeTab !== 'tags'}"
+                            class="px-3 py-2 text-sm font-medium focus:outline-none">
+                            标签
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-grow overflow-y-auto p-4">
+                    <div class="space-y-2">
+                        <!-- 分类筛选内容 -->
+                        <div v-show="activeTab === 'categories'" class="h-[calc(100vh-200px)] overflow-y-auto">
+                            <ul class="category-list space-y-0">
+                                <li v-for="(category, index) in allCategories" :key="index" class="tree-node">
+                                    <button @click="setFilter('category', category.value); showMobileFilter = false"
+                                        :class="{'filter-active': activeFilters.category === category.value}"
+                                        class="category-button w-full text-left px-3 py-1 rounded-lg text-white hover:bg-white/20 transition text-sm">
+                                        [[ category.label ]]
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- 标签筛选内容 -->
+                        <div v-show="activeTab === 'tags'" class="h-[calc(100vh-200px)] overflow-y-auto">
+                            <div class="flex flex-wrap gap-2">
+                                <span v-for="tag in allTags" :key="tag"
+                                    @click="toggleTagFilter(tag); showMobileFilter = false"
+                                    :class="{'bg-indigo-800 text-white': activeFilters.tags.includes(tag), 'bg-indigo-100 text-indigo-800': !activeFilters.tags.includes(tag)}"
+                                    class="inline-block text-xs px-3 py-1 rounded-full cursor-pointer hover:bg-indigo-200 relative">
+                                    [[ tag ]]
+                                    <span v-if="activeFilters.tags.includes(tag)" @click.stop="removeTagFilter(tag)"
+                                        class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer">
+                                        &times;
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 顶部固定区域 -->
+        <div class="sticky top-0 z-20 backdrop-blur-md bg-white/20">
+            <!-- Header -->
+            <header class="p-3 md:p-4">
+                <div
+                    class="glass-card p-3 md:p-4 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
+                    <!-- 左侧用户信息 -->
+                    <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+                        <div class="flex items-center gap-3">
+                            <img :src="user.avatar_url"
+                                class="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white" />
+                            <span class="font-semibold text-white text-base md:text-lg hidden md:inline">[[ user.login
+                                ]]</span>
+                        </div>
+
+                        <!-- 移动端按钮 -->
+                        <div class="flex md:hidden gap-2">
+                            <button @click="showMobileFilter = true"
+                                class="glass-button p-2 rounded-full w-10 h-10 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                </svg>
+                            </button>
+                            <a href="/settings"
+                                class="glass-button p-2 rounded-full w-10 h-10 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </a>
+                            <button @click="syncStars" :disabled="syncing"
+                                class="glass-button p-2 rounded-full flex items-center justify-center w-10 h-10">
+                                <span v-if="syncing" class="spinner"></span>
+                                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                            <button @click="logout"
+                                class="glass-button p-2 rounded-full w-10 h-10 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 右侧统计信息和按钮 -->
+                    <div class="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto mt-3 md:mt-0">
+                        <!-- 统计信息 -->
+                        <div class="flex gap-2 md:gap-3 h-10 w-full md:w-auto justify-between">
+                            <div
+                                class="glass-stat px-2 py-1 flex items-center justify-center gap-1 h-10 whitespace-nowrap flex-1 md:flex-none md:min-w-24">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                </svg>
+                                <span class="text-white text-sm">[[ stats.total_repos ]]</span>
+                            </div>
+                            <div
+                                class="glass-stat px-2 py-1 flex items-center justify-center gap-1 h-10 whitespace-nowrap flex-1 md:flex-none md:min-w-24">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                <span class="text-white text-sm">[[ stats.analyzed_repos ]]</span>
+                            </div>
+                            <div
+                                class="glass-stat px-2 py-1 flex items-center justify-center gap-1 h-10 whitespace-nowrap flex-1 md:flex-none md:min-w-24">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span class="text-white text-xs">[[ formatSyncTime(stats.last_sync) ]]</span>
+                            </div>
+                        </div>
+
+                        <!-- 桌面端按钮 -->
+                        <div class="hidden md:flex gap-2">
+                            <a href="/settings"
+                                class="glass-button p-2 rounded-full w-10 h-10 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </a>
+                            <button @click="syncStars" :disabled="syncing"
+                                class="glass-button p-2 rounded-full flex items-center justify-center w-10 h-10">
+                                <span v-if="syncing" class="spinner"></span>
+                                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                            <button @click="logout"
+                                class="glass-button p-2 rounded-full w-10 h-10 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 同步进度条 -->
+            <div v-if="syncing" class="px-4 md:px-6 pb-2">
+                <div class="glass-card p-3">
+                    <div class="flex justify-between text-white text-sm mb-1">
+                        <span class="truncate">[[ syncMessage ]]</span>
+                        <span class="ml-2">[[ syncProgress ]]%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" :style="{ width: syncProgress + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分页控件 -->
+            <div class="py-2 md:py-3 px-4 md:px-6">
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-2">
+                    <div class="mb-2 sm:mb-0 hidden md:flex items-center">
+                        <label class="mr-2 text-white">每页显示:</label>
+                        <select v-model="perPage" @change="updatePage"
+                            class="glass-button text-white px-3 py-1 rounded-lg">
+                            <option value="9" class="bg-gray-800 text-white">9</option>
+                            <option value="18" class="bg-gray-800 text-white">18</option>
+                            <option value="36" class="bg-gray-800 text-white">36</option>
+                        </select>
+                    </div>
+
+                    <div class="flex flex-wrap justify-center gap-1 w-full sm:w-auto items-center">
+                        <button @click="currentPage = 1" :disabled="currentPage === 1"
+                            class="glass-button text-white px-2 py-1 rounded-lg text-sm disabled:opacity-50">
+                            首页
+                        </button>
+                        <button @click="prevPage" :disabled="currentPage === 1"
+                            class="glass-button text-white px-2 py-1 rounded-lg text-sm disabled:opacity-50">
+                            上一页
+                        </button>
+                        <span class="glass-button text-white px-2 py-1 text-sm self-center">
+                            第 [[ currentPage ]] 页，共 [[ totalPages ]] 页
+                        </span>
+                        <button @click="nextPage" :disabled="currentPage === totalPages"
+                            class="glass-button text-white px-2 py-1 rounded-lg text-sm disabled:opacity-50">
+                            下一页
+                        </button>
+                        <button @click="currentPage = totalPages" :disabled="currentPage === totalPages"
+                            class="glass-button text-white px-2 py-1 rounded-lg text-sm disabled:opacity-50">
+                            末页
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主体内容区域 -->
+        <main class="flex-grow flex flex-col md:flex-row p-3 md:p-4 gap-3 md:gap-4 overflow-hidden">
+            <!-- 左侧筛选区域 -->
+            <div class="hidden md:block md:w-1/3 lg:w-1/4 xl:w-1/5 glass-card p-3 md:p-4 flex-shrink-0">
+                <!-- 搜索区域 -->
+                <div class="glass-button flex items-center flex-shrink-0">
+                    <input type="text" placeholder="搜索仓库..." v-model="searchQuery" @input="resetPage()"
+                        class="flex-grow bg-transparent text-white px-3 py-2 text-sm placeholder-white/70 focus:outline-none">
+                    <button class="text-white px-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 筛选区域 -->
+                <div class="flex flex-col flex-grow mt-2 h-[calc(100%-56px)]">
+                    <!-- Tab 切换 -->
+                    <div class="flex mb-4 border-b border-white/20 flex-shrink-0">
+                        <button @click="activeTab = 'categories'"
+                            :class="{'border-b-2 border-white text-white': activeTab === 'categories', 'text-white/70': activeTab !== 'categories'}"
+                            class="px-3 py-2 text-sm font-medium focus:outline-none">
+                            分类
+                        </button>
+                        <button @click="activeTab = 'tags'"
+                            :class="{'border-b-2 border-white text-white': activeTab === 'tags', 'text-white/70': activeTab !== 'tags'}"
+                            class="px-3 py-2 text-sm font-medium focus:outline-none">
+                            标签
+                        </button>
+                    </div>
+
+                    <!-- 分类筛选内容 -->
+                    <div v-show="activeTab === 'categories'" class="flex-grow overflow-y-auto">
+                        <ul class="category-list space-y-0 p-2">
+                            <li v-for="(category, index) in allCategories" :key="index" class="tree-node">
+                                <button @click="setFilter('category', category.value)"
+                                    :class="{'filter-active': activeFilters.category === category.value}"
+                                    class="category-button w-full text-left px-2 md:px-3 py-1 rounded-lg text-white hover:bg-white/20 transition text-sm">
+                                    [[ category.label ]]
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 标签筛选内容 -->
+                    <div v-show="activeTab === 'tags'" class="flex-grow overflow-y-auto">
+                        <div class="p-2">
+                            <div class="flex flex-wrap gap-1 md:gap-2">
+                                <span v-for="tag in allTags" :key="tag" @click="toggleTagFilter(tag)"
+                                    :class="{'bg-indigo-800 text-white': activeFilters.tags.includes(tag), 'bg-indigo-100 text-indigo-800': !activeFilters.tags.includes(tag)}"
+                                    class="inline-block text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-indigo-200 mb-1 relative">
+                                    [[ tag ]]
+                                    <span v-if="activeFilters.tags.includes(tag)" @click.stop="removeTagFilter(tag)"
+                                        class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs cursor-pointer">
+                                        &times;
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 右侧仓库卡片展示 -->
+            <div class="flex-grow flex flex-col overflow-hidden">
+                <!-- 隐藏PC端原来的搜索框 -->
+                <div class="glass-card p-3 md:p-4 flex-shrink-0 hidden md:hidden">
+                    <div class="flex flex-col md:flex-row gap-2 md:gap-3">
+                        <input type="text" placeholder="通过关键字搜索仓库..." v-model="searchQuery" @input="resetPage()"
+                            class="glass-button text-white px-3 md:px-4 py-2 rounded-lg flex-grow placeholder-white/70 text-sm md:text-base">
+                        <button
+                            class="glass-button text-white px-3 md:px-4 py-2 rounded-lg text-sm md:text-base">搜索</button>
+                    </div>
+                </div>
+
+                <!-- 仓库卡片网格 -->
+                <div class="flex-grow overflow-y-auto">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 p-4">
+                        <div v-for="repo in filteredAndPaginatedRepos" :key="repo.id"
+                            class="glass-card rounded-xl overflow-hidden flex flex-col h-full">
+                            <!-- 卡片头部 -->
+                            <div class="p-3 md:p-4 border-b border-white/20 flex-shrink-0 relative">
+                                <div class="absolute top-2 right-2 flex gap-1">
+                                    <button @click="openRepoEdit(repo)"
+                                        class="glass-button p-1.5 rounded-full hover:bg-white/20 transition-colors"
+                                        title="编辑">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                    </button>
+                                    <button @click="analyzeRepo(repo)" :disabled="repo.analyzing"
+                                        class="glass-button p-1.5 rounded-full hover:bg-white/20 transition-colors disabled:opacity-50"
+                                        :title="repo.analyzing ? '分析中...' : 'AI分析'">
+                                        <div v-if="repo.analyzing" class="w-4 h-4 flex items-center justify-center">
+                                            <div
+                                                class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin">
+                                            </div>
+                                        </div>
+                                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white"
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <div class="flex-grow min-w-0">
+                                        <h3 class="font-bold text-white truncate text-base md:text-lg">
+                                            <a :href="repo.html_url" target="_blank"
+                                                class="text-lg md:text-xl font-semibold text-white hover:underline truncate">
+                                                [[ repo.name ]]
+                                            </a>
+                                        </h3>
+                                        <div class="flex flex-wrap gap-1 mt-1 items-center">
+                                            <span v-if="repo.language"
+                                                :style="{ backgroundColor: getLanguageColor(repo.language) }"
+                                                class="inline-block px-2 py-0.5 text-xs rounded-full bg-white/20 text-white/90 leading-tight">
+                                                [[ repo.language ]]
+                                            </span>
+                                            <!-- 分类标签 -->
+                                            <div v-if="repo.category" class="inline-flex items-center">
+                                                <span
+                                                    class="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full leading-tight">
+                                                    [[ repo.category ]]
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 卡片主体 -->
+                            <div class="p-3 md:p-4 flex-grow relative group">
+                                <p class="text-white/90 text-sm md:text-base line-clamp-3" ref="descRefs"
+                                    @mouseenter="showTooltip(repo, $event)" @mouseleave="hideTooltip"
+                                    @touchstart.prevent="touchStart(repo, $event)" @touchend.prevent="touchEnd">
+                                    [[ repo.description || '暂无描述' ]]
+                                </p>
+
+                                <!-- 标签 -->
+                                <div class="mt-3 flex flex-wrap gap-1.5">
+                                    <span v-for="tag in getRepoTags(repo)" :key="tag"
+                                        class="inline-block px-2 py-0.5 text-xs rounded-full bg-purple-500/80 text-white truncate max-w-[120px]">
+                                        [[ tag ]]
+                                    </span>
+                                    <span v-if="getRepoTags(repo).length === 0"
+                                        class="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-500/80 text-white">
+                                        未标记
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- Tooltip 放到 body -->
+                            <teleport to="body">
+                                <div v-if="tooltip.visible"
+                                    :style="{ position: 'fixed', top: tooltip.top + 'px', left: tooltip.left + 'px', transform: 'translateY(-100%)' }"
+                                    class="glass-card bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500  p-3 text-white text-sm rounded-lg w-64 md:w-80 break-words z-[9999]">
+                                    [[ tooltip.text ]]
+                                </div>
+                            </teleport>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 编辑区域 - 弹窗形式 -->
+            <div v-if="repoEditing"
+                class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="glass-card flex flex-col h-[32rem] w-full max-w-2xl rounded-lg">
+                    <!-- 标签输入 -->
+                    <div class="p-3 md:p-4 flex-shrink-0">
+                        <div class="flex items-center mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white mr-2" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                            <span class="text-white font-medium">标签</span>
+                        </div>
+
+                        <!-- 显示已添加的标签 -->
+                        <div class="flex flex-wrap gap-1 mb-2 min-h-6">
+                            <span v-for="(tag, index) in getTagArray(editingRepo)" :key="index"
+                                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                [[ tag ]]
+                                <button @click="removeTag(editingRepo, index)"
+                                    class="ml-1 text-indigo-600 hover:text-indigo-900">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </span>
+                        </div>
+
+                        <!-- 添加新标签输入框 -->
+                        <div class="glass-button flex items-center rounded-lg">
+                            <input v-model="editingRepo.newTagInput" placeholder="输入新标签，支持逗号或空格分隔添加多个"
+                                @keyup.enter="addTag(editingRepo)"
+                                class="text-white px-3 py-2 rounded-l-lg flex-grow bg-transparent placeholder-white/50 focus:outline-none w-full" />
+                            <button @click="addTag(editingRepo)"
+                                class="text-white rounded-r-lg hover:bg-white/20 p-2 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 描述编辑 -->
+                    <div class="px-3 md:px-4 mb-4 flex-shrink-0">
+                        <div class="flex items-center mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white mr-2" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            <span class="text-white font-medium">描述</span>
+                        </div>
+                        <div class="glass-button rounded-lg">
+                            <textarea v-model="editingRepo.description" rows="6" placeholder="请输入项目描述..."
+                                class="text-white px-3 py-2 rounded-lg w-full bg-transparent placeholder-white/50 focus:outline-none resize-none"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 分类选择 -->
+                    <div class="px-3 md:px-4 mb-4 flex-shrink-0">
+                        <div class="flex items-center mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white mr-2" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            </svg>
+                            <span class="text-white font-medium">分类</span>
+                        </div>
+                        <div class="glass-button rounded-lg relative">
+                            <select v-model="editingRepo.category"
+                                class="text-white px-3 py-2 rounded-lg flex-grow w-full bg-transparent appearance-none focus:outline-none">
+                                <option v-for="category in categories" :key="category.value" :value="category.value"
+                                    class="text-gray-800">
+                                    [[ category.label ]]
+                                </option>
+                            </select>
+                            <!-- 添加下拉箭头图标 -->
+                            <div class="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="flex justify-end gap-3 px-3 md:px-4 mt-auto pb-3 md:pb-4">
+                        <button @click="cancelRepoEdit(editingRepo)"
+                            class="glass-button px-4 py-2 rounded-lg text-white hover:bg-white/20">
+                            取消
+                        </button>
+                        <button @click="saveRepoEdit(editingRepo)"
+                            class="glass-button px-4 py-2 rounded-lg text-white hover:bg-white/20">
+                            保存
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script>
+        const app = Vue.createApp({
+            delimiters: ['[[', ']]'],
+            data() {
+                return {
+                    user: {},
+                    repos: [],
+                    categories: [], // 这个变量保存所有分类
+                    allCategories: [], // 添加这个变量来存储所有分类（包括没有仓库的）
+                    stats: {
+                        total_repos: 0,
+                        analyzed_repos: 0,
+                        last_sync: '暂无同步'
+                    },
+                    syncing: false,
+                    syncMessage: '',
+                    syncProgress: 0,
+                    currentPage: 1,
+                    perPage: 9,
+                    ws: null,
+                    showMobileFilter: false,
+                    activeFilters: {
+                        category: null,
+                        tags: []
+                    },
+                    searchQuery: '',
+                    activeTab: 'categories', // 添加tab切换变量，默认显示分类
+                    repoEditing: false,
+                    editingRepo: {}, // 添加专门用于编辑的仓库对象
+                    toasts: [], // Toast消息数组
+                    tooltip: { visible: false, text: '', repoId: null, top: 0, left: 0 },
+                    touchTimer: null,
+                };
+            },
+            computed: {
+                totalPages() {
+                    return Math.ceil(this.filteredRepos.length / this.perPage);
+                },
+                allTags() {
+                    const tags = new Set();
+                    this.repos.forEach(repo => {
+                        // 只添加用户自定义标签，最多3个
+                        if (repo.tag) {
+                            const userTags = repo.tag.split(',').map(t => t.trim()).slice(0, 3);
+                            userTags.forEach(tag => {
+                                if (tag) {
+                                    tags.add(tag);
+                                }
+                            });
+                        }
+                    });
+                    return Array.from(tags).sort();
+                },
+                filteredRepos() {
+                    return this.repos.filter(repo => {
+                        // 分类筛选
+                        if (this.activeFilters.category !== null) {
+                            // 如果选择了特定分类（包括"未分类"），则筛选对应分类的仓库
+                            if (this.activeFilters.category === '' && repo.category !== '') {
+                                return false;
+                            }
+                            if (this.activeFilters.category !== '' && repo.category !== this.activeFilters.category) {
+                                return false;
+                            }
+                        }
+                        // 如果activeFilters.category为null，表示选择"全部"，不需要筛选分类
+
+                        // 标签筛选
+                        if (this.activeFilters.tags.length > 0) {
+                            const repoTags = [];
+                            if (repo.tag) {
+                                repoTags.push(...repo.tag.split(',').map(t => t.trim()));
+                            }
+                            if (repo.topics) {
+                                repoTags.push(...repo.topics.map(t => t.trim()));
+                            }
+
+                            const hasMatchingTag = this.activeFilters.tags.some(tag =>
+                                repoTags.includes(tag)
+                            );
+
+                            if (!hasMatchingTag) {
+                                return false;
+                            }
+                        }
+
+                        // 搜索关键词筛选
+                        if (this.searchQuery) {
+                            const query = this.searchQuery.toLowerCase();
+                            const matchesName = repo.name && repo.name.toLowerCase().includes(query);
+                            const matchesDescription = repo.description && repo.description.toLowerCase().includes(query);
+                            const matchesLanguage = repo.language && repo.language.toLowerCase().includes(query);
+
+                            let matchesTags = false;
+                            if (repo.tag) {
+                                matchesTags = repo.tag.toLowerCase().includes(query);
+                            }
+
+                            let matchesTopics = false;
+                            if (repo.topics) {
+                                matchesTopics = repo.topics.some(topic =>
+                                    topic && topic.toLowerCase().includes(query)
+                                );
+                            }
+
+                            if (!matchesName && !matchesDescription && !matchesLanguage && !matchesTags && !matchesTopics) {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    });
+                },
+                filteredAndPaginatedRepos() {
+                    // 在返回分页结果前，确保当前页码有效
+                    const maxPage = Math.max(1, Math.ceil(this.filteredRepos.length / this.perPage));
+                    if (this.currentPage > maxPage) {
+                        this.currentPage = maxPage;
+                    }
+                    if (this.currentPage < 1) {
+                        this.currentPage = 1;
+                    }
+
+                    const start = (this.currentPage - 1) * this.perPage;
+                    const end = start + this.perPage;
+                    return this.filteredRepos.slice(start, end);
+                },
+                syncButtonText() {
+                    if (this.syncing) {
+                        return '同步中...';
+                    }
+                    return '同步 Stars';
+                }
+            },
+            methods: {
+                showTooltip(repo, event) {
+                    const el = event.target;
+                    if (el.scrollHeight > el.clientHeight) {
+                        const rect = el.getBoundingClientRect();
+                        this.tooltip = {
+                            visible: true,
+                            text: repo.description || '暂无描述',
+                            repoId: repo.id,
+                            top: rect.top,
+                            left: rect.left,
+                        };
+                    }
+                },
+                hideTooltip() {
+                    this.tooltip.visible = false;
+                    this.tooltip.repoId = null;
+                    if (this.touchTimer) {
+                        clearTimeout(this.touchTimer);
+                        this.touchTimer = null;
+                    }
+                },
+                touchStart(repo, event) {
+                    const el = event.target;
+                    if (el.scrollHeight > el.clientHeight) {
+                        // 500ms 长按显示 tooltip
+                        this.touchTimer = setTimeout(() => {
+                            const rect = el.getBoundingClientRect();
+                            this.tooltip = {
+                                visible: true,
+                                text: repo.description || '暂无描述',
+                                repoId: repo.id,
+                                top: rect.top,
+                                left: rect.left,
+                            };
+                        }, 500);
+                    }
+                },
+                touchEnd() {
+                    if (this.touchTimer) {
+                        clearTimeout(this.touchTimer);
+                        this.touchTimer = null;
+                    }
+                    // 手指移开立即隐藏 tooltip
+                    this.hideTooltip();
+                },
+                // Toast相关方法
+                showToast(message, type = 'info') {
+                    const toast = { message, type, show: true };
+                    this.toasts.push(toast);
+                    console.log('Toast:', toast);
+                    // 3秒后自动移除
+                    setTimeout(() => {
+                        // 查找当前toast的索引并移除
+                        const index = this.toasts.indexOf(toast);
+                        if (index !== -1) {
+                            this.removeToast(index);
+                        }
+                    }, 3000);
+                },
+
+                removeToast(index) {
+                    if (this.toasts.length > 0 && index < this.toasts.length) {
+                        this.toasts[index].show = false;
+                        setTimeout(() => {
+                            this.toasts.splice(index, 1);
+                        }, 300);
+                    }
+                },
+
+                getToastIcon(type) {
+                    switch (type) {
+                        case 'success': return '✓';
+                        case 'error': return '✕';
+                        case 'info': return 'ℹ';
+                        default: return '';
+                    }
+                },
+
+                async fetchUser() {
+                    const res = await axios.get('/api/user');
+                    this.user = res.data;
+                },
+                async fetchRepos() {
+                    try {
+                        const res = await axios.get('/api/repos');
+                        this.repos = res.data;
+                    } catch (error) {
+                        console.error('获取仓库列表失败:', error);
+                        this.showToast("获取仓库列表失败", "error");
+                        // 发生错误时确保repos是空数组
+                        this.repos = [];
+                    }
+                },
+                async fetchCategories() {
+                    try {
+                        const res = await axios.get('/api/categories');
+                        // 保存所有分类到allCategories，包括"全部"和"未分类"
+                        this.allCategories = [
+                            { value: null, label: '全部' },
+                            { value: '', label: '未分类' },
+                            ...res.data.map(category => ({
+                                value: category.value,
+                                label: category.label,
+                            })),
+                        ];
+                        // 保持categories变量用于其他用途
+                        this.categories = [
+                            { value: '', label: '未分类' },
+                            ...res.data.map(category => ({
+                                value: category.value || category.id,
+                                label: category.label || category.name
+                            }))
+                        ];
+                    } catch (error) {
+                        console.error("获取分类列表失败:", error);
+                        // 即使获取失败，也要确保基础分类存在
+                        this.allCategories = [
+                            { value: null, label: '全部' },
+                            { value: '', label: '未分类' }
+                        ];
+                        this.categories = [
+                            { value: '', label: '未分类' }
+                        ];
+                        this.showToast("获取分类列表失败: " + error.message, "error");
+                    }
+                },
+                setFilter(type, value) {
+                    if (type === 'category') {
+                        this.activeFilters.category = value;
+                        this.resetPage();
+                    }
+                },
+                async fetchStats() {
+                    try {
+                        const res = await axios.get('/api/stats');
+                        this.stats = res.data;
+                    } catch (error) {
+                        console.error("获取统计信息失败:", error);
+                        this.showToast("获取统计信息失败: " + error.message, "error");
+                    }
+                },
+                syncStars() {
+                    if (this.syncing) return;
+
+                    this.syncing = true;
+                    this.syncProgress = 0;
+                    this.syncMessage = '正在连接...';
+                    this.syncCurrent = 0;
+                    this.syncTotal = 0;
+
+                    // 连接到WebSocket
+                    const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') +
+                        location.host + '/api/sync-progress';
+                    this.ws = new WebSocket(wsUrl);
+
+                    this.ws.onopen = () => {
+                        this.syncMessage = '已连接，准备同步...';
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        switch (data.type) {
+                            case 'start':
+                                this.syncMessage = data.message;
+                                this.syncProgress = data.progress;
+                                break;
+                            case 'info':
+                                this.syncMessage = data.message;
+                                this.syncProgress = data.progress;
+                                if (data.total) {
+                                    this.syncTotal = data.total;
+                                }
+                                break;
+                            case 'progress':
+                                this.syncMessage = data.message;
+                                this.syncProgress = data.progress;
+                                if (data.current && data.total) {
+                                    this.syncCurrent = data.current;
+                                    this.syncTotal = data.total;
+                                }
+                                break;
+                            case 'complete':
+                                this.syncMessage = data.message;
+                                this.syncProgress = data.progress;
+                                if (data.total) {
+                                    this.syncTotal = data.total;
+                                }
+
+                                // 关闭WebSocket连接
+                                this.ws.close();
+
+                                // 短暂延迟后重置状态并刷新数据
+                                setTimeout(async () => {
+                                    this.syncing = false;
+                                    await this.fetchRepos();
+                                    await this.fetchStats();
+                                    this.showToast("同步完成", "success");
+                                }, 500);
+                                break;
+                            case 'error':
+                                this.syncMessage = '错误: ' + data.message;
+                                this.syncing = false;
+                                this.ws.close();
+                                this.showToast("同步失败: " + data.message, "error");
+                                break;
+                        }
+                    };
+
+                    this.ws.onerror = (error) => {
+                        this.syncing = false;
+                        this.syncMessage = '连接错误';
+                        console.error('WebSocket error:', error);
+                        this.showToast("同步连接失败", "error");
+                    };
+
+                    this.ws.onclose = () => {
+                        // 如果不是因为完成而关闭，且仍在同步状态，则标记为错误
+                        if (this.syncing) {
+                            this.syncing = false;
+                            this.syncMessage = '连接已关闭';
+                        }
+                    };
+                },
+                openRepoEdit(repo) {
+                    // 创建当前编辑仓库的副本
+                    this.editingRepo = {
+                        ...repo,
+                        newTags: repo.tag || "",
+                        newTagInput: "",
+                        description: repo.description || ""
+                    };
+                    this.repoEditing = true;
+                },
+                async saveRepoEdit(repo) {
+                    // 处理标签数组
+                    if (repo.newTags !== undefined) {
+                        repo.tag = repo.newTags;
+                    }
+
+                    // 调用后端接口更新标签和分类
+                    try {
+                        await axios.post(`/api/repos/${repo.id}/tag`, { tag: repo.tag });
+                        await axios.post(`/api/repos/${repo.id}/category`, { category: repo.category });
+                        await axios.post(`/api/repos/${repo.id}/description`, { description: repo.description });
+                        this.repoEditing = false;
+
+                        // 更新仓库列表中的数据
+                        const index = this.repos.findIndex(r => r.id === repo.id);
+                        if (index !== -1) {
+                            this.repos[index] = {
+                                ...this.repos[index],
+                                tag: repo.tag,
+                                category: repo.category,
+                                description: repo.description
+                            };
+                        }
+
+                        this.showToast("更新成功", "success");
+                    } catch (error) {
+                        this.showToast("更新失败: " + error.message, "error");
+                    }
+                },
+
+                // 取消编辑
+                cancelRepoEdit(repo) {
+                    this.repoEditing = false;
+                    repo.newTags = repo.tag; // 恢复到原始标签值
+                    repo.newTagInput = ""; // 清空输入框
+                },
+
+                // 获取标签数组
+                getTagArray(repo) {
+                    return repo.newTags ? repo.newTags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+                },
+
+                // 添加标签
+                addTag(repo) {
+                    if (repo.newTagInput && repo.newTagInput.trim() !== '') {
+                        const tagArray = this.getTagArray(repo);
+
+                        // 支持逗号或空格分隔的多个标签
+                        // 先按逗号分割，再按空格分割，然后去除空字符串
+                        let newTags = [];
+                        const commaSeparated = repo.newTagInput.split(',');
+                        commaSeparated.forEach(part => {
+                            if (part.includes(' ')) {
+                                // 如果包含空格，则按空格分割
+                                newTags.push(...part.split(' ').filter(tag => tag.trim() !== ''));
+                            } else {
+                                // 否则直接添加（去除首尾空格）
+                                const trimmed = part.trim();
+                                if (trimmed !== '') {
+                                    newTags.push(trimmed);
+                                }
+                            }
+                        });
+
+                        // 去除所有标签的首尾空格
+                        newTags = newTags.map(tag => tag.trim()).filter(tag => tag !== '');
+
+                        // 添加新标签（避免重复）
+                        newTags.forEach(newTag => {
+                            if (!tagArray.includes(newTag)) {
+                                tagArray.push(newTag);
+                            }
+                        });
+
+                        repo.newTags = tagArray.join(',');
+                        repo.newTagInput = '';
+                    }
+                },
+
+                // 删除标签
+                removeTag(repo, index) {
+                    const tagArray = this.getTagArray(repo);
+                    tagArray.splice(index, 1);
+                    repo.newTags = tagArray.join(',');
+                },
+
+                // 获取仓库标签数组
+                getRepoTags(repo) {
+                    if (repo.tag) {
+                        return repo.tag.split(',').map(tag => tag.trim()).filter(tag => tag);
+                    }
+                    return [];
+                },
+
+                // 获取语言颜色
+                getLanguageColor(language) {
+                    const languageColors = {
+                        'JavaScript': '#f1e05a',
+                        'Python': '#3572A5',
+                        'Java': '#b07219',
+                        'TypeScript': '#2b7489',
+                        'C++': '#f34b7d',
+                        'C#': '#178600',
+                        'Go': '#00ADD8',
+                        'Ruby': '#701516',
+                        'PHP': '#4F5D95',
+                        'Swift': '#ffac45',
+                        'Kotlin': '#F18E33',
+                        'Rust': '#dea584',
+                        'Scala': '#c22d40',
+                        'Shell': '#89e051',
+                        'Vue': '#41b883',
+                        'React': '#61dafb',
+                        'CSS': '#563d7c',
+                        'HTML': '#e34c26',
+                        'C': '#555555',
+                        'Dart': '#00B4AB',
+                        'Elixir': '#6e4a7e',
+                        'Erlang': '#B83998',
+                        'Haskell': '#5e5086',
+                        'Lua': '#000080',
+                        'Objective-C': '#438eff',
+                        'Perl': '#0298c3',
+                        'R': '#198ce7',
+                        'SQL': '#e38c00',
+                        'Dockerfile': '#384d54'
+                    };
+                    return languageColors[language] || '#ccc';
+                },
+
+                logout() {
+                    window.location.href = "/logout";
+                },
+                prevPage() {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                    }
+                },
+                nextPage() {
+                    if (this.currentPage < this.totalPages) {
+                        this.currentPage++;
+                    }
+                },
+                updatePage() {
+                    // 如果当前页超出了总页数，则回到最后一页
+                    if (this.currentPage > this.totalPages) {
+                        this.currentPage = this.totalPages || 1;
+                    }
+                    // 如果总页数为0，则设置当前页为1
+                    if (this.totalPages === 0) {
+                        this.currentPage = 1;
+                    }
+                },
+                resetPage() {
+                    // 重置到第一页
+                    this.currentPage = 1;
+                },
+                formatSyncTime(timeString) {
+                    if (!timeString || timeString === "暂无同步") {
+                        return "未同步";
+                    }
+
+                    // 尝试解析时间字符串
+                    const syncDate = new Date(timeString);
+                    if (isNaN(syncDate.getTime())) {
+                        return timeString;
+                    }
+
+                    const now = new Date();
+                    const diffMs = now - syncDate;
+                    const diffHours = diffMs / (1000 * 60 * 60);
+                    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+                    // 一小时内显示分钟
+                    if (diffHours < 1) {
+                        const minutes = Math.floor(diffMs / (1000 * 60));
+                        return `${Math.max(1, minutes)}分钟前`;
+                    }
+
+                    // 一天内显示小时
+                    if (diffDays < 1) {
+                        const hours = Math.floor(diffHours);
+                        return `${hours}小时前`;
+                    }
+
+                    // 超出一天显示天数
+                    const days = Math.floor(diffDays);
+                    return `${days}天前`;
+                },
+                setFilter(type, value) {
+                    if (type === 'category') {
+                        this.activeFilters.category = value;
+                        this.resetPage();
+                    }
+                },
+                toggleTagFilter(tag) {
+                    const index = this.activeFilters.tags.indexOf(tag);
+                    if (index > -1) {
+                        // 如果标签已经在激活状态，则移除它
+                        this.activeFilters.tags.splice(index, 1);
+                    } else {
+                        // 否则添加标签到激活列表
+                        this.activeFilters.tags.push(tag);
+                    }
+                    this.resetPage();
+                },
+                removeTagFilter(tag) {
+                    const index = this.activeFilters.tags.indexOf(tag);
+                    if (index > -1) {
+                        this.activeFilters.tags.splice(index, 1);
+                        this.resetPage();
+                    }
+                },
+                // AI分析仓库
+                async analyzeRepo(repo) {
+                    // 防止重复点击
+                    if (repo.analyzing) {
+                        return;
+                    }
+
+                    try {
+                        // 设置分析状态
+                        repo.analyzing = true;
+
+                        // 显示分析中提示
+                        this.showToast("正在使用AI分析仓库...", "info");
+
+                        // 调用后端AI分析接口
+                        const response = await axios.post(`/api/repos/${repo.id}/analyze`);
+
+                        // 更新仓库信息
+                        const index = this.repos.findIndex(r => r.id === repo.id);
+                        if (index !== -1) {
+                            this.repos[index].category = response.data.category;
+                            this.repos[index].tag = response.data.tags.join(',');
+                            // 更新描述为AI分析的结果
+                            this.repos[index].description = response.data.description;
+                        }
+
+                        // 显示成功提示
+                        this.showToast("AI分析完成，结果已保存", "success");
+
+                        // 刷新统计信息
+                        await this.fetchStats();
+                    } catch (error) {
+                        console.error("AI分析失败:", error);
+                        const errorMsg = error.response?.data?.error || error.message || "未知错误";
+                        this.showToast("AI分析失败: " + errorMsg, "error");
+                    } finally {
+                        // 重置分析状态
+                        repo.analyzing = false;
+                    }
+                }
+            },
+            mounted() {
+                this.fetchUser();
+                this.fetchRepos();
+                this.fetchStats();
+                this.fetchCategories();
+            },
+        });
+        app.mount('#app');
+    </script>
+
+</body>
+
+</html>

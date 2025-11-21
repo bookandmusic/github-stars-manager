@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - GitHub Stars 管理器</title>
+
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+    <!-- Axios CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <style>
+        .glass-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            border-radius: 10px;
+        }
+
+        .glass-button {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px 0 rgba(31, 38, 135, 0.1);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .glass-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 6px 25px 0 rgba(31, 38, 135, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .glass-button:active {
+            transform: translateY(0);
+        }
+
+        .glass-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .form-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 6px;
+            padding: 0.5rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.8);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .success-badge {
+            background-color: rgba(72, 187, 120, 0.9);
+            color: white;
+        }
+
+        .error-badge {
+            background-color: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .testing-badge {
+            background-color: rgba(59, 130, 246, 0.9);
+            color: white;
+        }
+
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 2px solid white;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Toast 组件样式 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 300px;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background-color: rgba(72, 187, 120, 0.9);
+            color: white;
+        }
+
+        .toast.error {
+            background-color: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .toast.info {
+            background-color: rgba(59, 130, 246, 0.9);
+            color: white;
+        }
+
+        .toast .toast-icon {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+
+        .toast .toast-message {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .toast .toast-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen">
+    <div id="app" class="flex flex-col h-screen">
+        <!-- Toast容器 -->
+        <div class="toast-container">
+            <div v-for="(toast, index) in toasts" :key="index" :class="['toast', toast.type, { show: toast.show }]">
+                <span class="toast-icon">[[ getToastIcon(toast.type) ]]</span>
+                <span class="toast-message">[[ toast.message ]]</span>
+                <button class="toast-close" @click="removeToast(index)">&times;</button>
+            </div>
+        </div>
+
+        <!-- 顶部固定区域 -->
+        <div class="sticky top-0 z-20 backdrop-blur-md bg-white/20">
+            <!-- Header -->
+            <header class="p-3 md:p-4">
+                <div
+                    class="glass-card p-3 md:p-4 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
+                    <!-- 左侧标题和返回按钮 -->
+                    <div class="flex items-center gap-3 w-full md:w-auto">
+                        <button @click="goBack"
+                            class="glass-button p-2 rounded-full w-10 h-10 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                        </button>
+                        <h1 class="text-white text-xl font-bold">设置</h1>
+                    </div>
+                </div>
+            </header>
+        </div>
+
+        <!-- 主要内容区域 -->
+        <main class="flex-grow overflow-y-auto p-4">
+            <div class="max-w-4xl mx-auto">
+                <!-- OpenAI 配置 -->
+                <div class="glass-card p-6 mb-6">
+                    <h2 class="text-white text-xl font-bold mb-4">OpenAI 配置</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white text-sm font-medium mb-1">API Key</label>
+                            <input type="password" v-model="settings.openai.key" placeholder="输入 OpenAI API Key"
+                                class="form-input w-full">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-white text-sm font-medium mb-1">API Endpoint</label>
+                            <input type="text" v-model="settings.openai.endpoint" placeholder="OpenAI API 地址"
+                                class="form-input w-full">
+                        </div>
+
+                        <div>
+                            <label class="block text-white text-sm font-medium mb-1">模型</label>
+                            <input type="text" v-model="settings.openai.model" placeholder="例如: gpt-3.5-turbo"
+                                class="form-input w-full">
+                        </div>
+                    </div>
+
+                    <!-- 自定义请求头 -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-white text-lg font-semibold">自定义请求头</h3>
+                            <button @click="addHeader" class="glass-button px-4 py-2 text-sm flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                添加
+                            </button>
+                        </div>
+                        
+                        <div v-if="!settings.openai.headers || settings.openai.headers.length === 0" class="text-white/60 text-sm mb-2">
+                            暂无自定义请求头
+                        </div>
+                        
+                        <div v-for="(header, index) in settings.openai.headers" :key="index" class="grid grid-cols-12 gap-2 mb-2">
+                            <div class="col-span-5">
+                                <input type="text" v-model="header.key" placeholder="请求头键"
+                                    class="form-input w-full text-sm h-10">
+                            </div>
+                            <div class="col-span-5">
+                                <input type="text" v-model="header.value" placeholder="请求头值"
+                                    class="form-input w-full text-sm h-10">
+                            </div>
+                            <div class="col-span-2">
+                                <button @click="removeHeader(index)" 
+                                    class="glass-button w-full h-10 px-2 text-sm flex items-center justify-center text-red-400 hover:text-red-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 自定义请求体 -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-white text-lg font-semibold">自定义请求体</h3>
+                            <button @click="addBodyField" class="glass-button px-4 py-2 text-sm flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                添加
+                            </button>
+                        </div>
+                        
+                        <div v-if="!settings.openai.body || settings.openai.body.length === 0" class="text-white/60 text-sm mb-2">
+                            暂无自定义请求体参数
+                        </div>
+                        
+                        <div v-for="(field, index) in settings.openai.body" :key="index" class="grid grid-cols-12 gap-2 mb-2">
+                            <div class="col-span-5">
+                                <input type="text" v-model="field.key" placeholder="字段键 (支持嵌套，如: parameters.temperature)"
+                                    class="form-input w-full text-sm h-10">
+                            </div>
+                            <div class="col-span-5">
+                                <input type="text" v-model="field.value" placeholder="字段值"
+                                    class="form-input w-full text-sm h-10">
+                            </div>
+                            <div class="col-span-2">
+                                <button @click="removeBodyField(index)" 
+                                    class="glass-button w-full h-10 px-2 text-sm flex items-center justify-center text-red-400 hover:text-red-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2">
+                        <button @click="testOpenAI" :disabled="testingOpenAI"
+                            class="glass-button px-4 py-2 flex items-center gap-2">
+                            <span v-if="testingOpenAI" class="spinner"></span>
+                            <span>[[ testingOpenAI ? '测试中...' : '测试连接' ]]</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- WebDAV 配置 -->
+                <div class="glass-card p-6 mb-6">
+                    <h2 class="text-white text-xl font-bold mb-4">WebDAV 配置</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-white text-sm font-medium mb-1">服务器地址</label>
+                            <input type="text" v-model="settings.webdav.url" placeholder="WebDAV 服务器地址"
+                                class="form-input w-full">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-white text-sm font-medium mb-1">用户名</label>
+                            <input type="text" v-model="settings.webdav.username" placeholder="WebDAV 用户名"
+                                class="form-input w-full">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-white text-sm font-medium mb-1">密码</label>
+                            <input type="password" v-model="settings.webdav.password" placeholder="WebDAV 密码"
+                                class="form-input w-full">
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2">
+                        <button @click="testWebDAV" :disabled="testingWebDAV"
+                            class="glass-button px-4 py-2 flex items-center gap-2">
+                            <span v-if="testingWebDAV" class="spinner"></span>
+                            <span>[[ testingWebDAV ? '测试中...' : '测试连接' ]]</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 保存按钮 -->
+                <div class="glass-card p-6">
+                    <div class="flex justify-end">
+                        <button @click="saveSettings" :disabled="saving"
+                            class="glass-button px-6 py-2 font-medium text-white flex items-center gap-2">
+                            <span v-if="saving" class="spinner"></span>
+                            <span>[[ saving ? '保存中...' : '保存设置' ]]</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        const app = createApp({
+            delimiters: ['[[', ']]'],
+            data() {
+                return {
+                    toasts: [],
+                    settings: {
+                        openai: {
+                            key: '',
+                            endpoint: '',
+                            model: 'gpt-3.5-turbo',
+                            headers: [],
+                            body: []
+                        },
+                        webdav: {
+                            url: '',
+                            username: '',
+                            password: ''
+                        }
+                    },
+                    testingOpenAI: false,
+                    testingWebDAV: false,
+                    saving: false,
+                    openaiTestResult: null,
+                    webdavTestResult: null
+                };
+            },
+            methods: {
+                // Toast通知
+                showToast(message, type = 'info') {
+                    const id = Date.now();
+                    this.toasts.push({
+                        id,
+                        message,
+                        type,
+                        show: true
+                    });
+
+                    setTimeout(() => {
+                        this.removeToast(this.toasts.findIndex(t => t.id === id));
+                    }, 3000);
+                },
+
+                removeToast(index) {
+                    if (index >= 0 && index < this.toasts.length) {
+                        this.toasts[index].show = false;
+                        setTimeout(() => {
+                            this.toasts.splice(index, 1);
+                        }, 300);
+                    }
+                },
+
+                getToastIcon(type) {
+                    switch (type) {
+                        case 'success':
+                            return '✓';
+                        case 'error':
+                            return '✕';
+                        case 'info':
+                            return 'ℹ';
+                        default:
+                            return '';
+                    }
+                },
+
+                // 页面导航
+                goBack() {
+                    window.location.href = '/';
+                },
+
+                // 添加自定义请求头
+                addHeader() {
+                    this.settings.openai.headers.push({ key: '', value: '' });
+                },
+                
+                // 删除自定义请求头
+                removeHeader(index) {
+                    this.settings.openai.headers.splice(index, 1);
+                },
+                
+                // 添加自定义请求体字段
+                addBodyField() {
+                    this.settings.openai.body.push({ key: '', value: '' });
+                },
+                
+                // 删除自定义请求体字段
+                removeBodyField(index) {
+                    this.settings.openai.body.splice(index, 1);
+                },
+
+                // 加载设置
+                async loadSettings() {
+                    try {
+                        const response = await axios.get('/api/settings');
+                        this.settings = response.data;
+                        // 确保headers和body字段存在且为数组
+                        if (!this.settings.openai.headers) {
+                            this.settings.openai.headers = [];
+                        }
+                        if (!this.settings.openai.body) {
+                            this.settings.openai.body = [];
+                        }
+                    } catch (error) {
+                        console.error('加载设置失败:', error);
+                        this.showToast('加载设置失败', 'error');
+                    }
+                },
+
+                // 测试 OpenAI 连接
+                async testOpenAI() {
+                    this.testingOpenAI = true;
+                    this.openaiTestResult = null;
+                    try {
+                        const response = await axios.post('/api/test-openai', this.settings.openai);
+                        this.openaiTestResult = response.data.success;
+                        this.showToast(response.data.message, response.data.success ? 'success' : 'error');
+                    } catch (error) {
+                        this.openaiTestResult = false;
+                        this.showToast('测试 OpenAI 连接失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.testingOpenAI = false;
+                    }
+                },
+
+                // 测试 WebDAV 连接
+                async testWebDAV() {
+                    this.testingWebDAV = true;
+                    this.webdavTestResult = null;
+                    try {
+                        const response = await axios.post('/api/test-webdav', this.settings.webdav);
+                        this.webdavTestResult = response.data.success;
+                        this.showToast(response.data.message, response.data.success ? 'success' : 'error');
+                    } catch (error) {
+                        this.webdavTestResult = false;
+                        this.showToast('测试 WebDAV 连接失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.testingWebDAV = false;
+                    }
+                },
+
+                // 保存设置
+                async saveSettings() {
+                    this.saving = true;
+                    try {
+                        await axios.post('/api/settings', this.settings);
+                        this.showToast('设置已保存', 'success');
+                    } catch (error) {
+                        this.showToast('保存设置失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.saving = false;
+                    }
+                }
+            },
+            mounted() {
+                this.loadSettings();
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</body>
+
+</html>
