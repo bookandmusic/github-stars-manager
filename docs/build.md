@@ -6,6 +6,8 @@
 
 - Go 1.25+
 - Git
+- Node.js 24+
+- pnpm
 
 ## 克隆项目
 
@@ -13,6 +15,31 @@
 git clone https://github.com/bookandmusic/github-stars-manager.git
 cd github-stars-manager
 ```
+
+## 构建前端
+
+1. 进入frontend目录安装依赖：
+   ```bash
+   cd frontend
+   pnpm install
+   ```
+
+2. 构建前端资源：
+   ```bash
+   pnpm build
+   ```
+
+3. 复制构建产物到项目目录：
+   ```bash
+   # 清理并复制HTML文件到templates目录
+   rm -f ../templates/*.html
+   cp dist/*.html ../templates/
+
+   # 清理并复制静态资源到static目录
+   rm -rf ../static/*
+   mkdir -p ../static
+   cp -r dist/static/* ../static/
+   ```
 
 ## 配置环境变量
 

@@ -1,3 +1,11 @@
+# Frontend build stage
+FROM --platform=$BUILDPLATFORM  node:24 AS frontend-builder
+
+WORKDIR /app
+COPY frontend ./frontend
+WORKDIR /app/frontend
+RUN npm install -g pnpm && pnpm install && pnpm build
+
 # Build stage
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
@@ -35,7 +43,9 @@ COPY --from=builder /app/github-stars-manager .
 RUN mkdir -p data static
 
 # Copy templates
-COPY --from=builder /app/templates ./templates
+COPY --from=frontend-builder /app/frontend/dist/*.html templates/
+# Copy static assets
+COPY --from=frontend-builder /app/frontend/dist/static/ static/
 
 # Expose port
 EXPOSE 8181

@@ -4,6 +4,7 @@ import (
 	"github-stars-manager/config"
 	"github-stars-manager/controllers"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,13 +29,21 @@ func (s *Server) Run() error {
 
 func SetupRouter(sh *controllers.StarHandler, ah *controllers.AuthHandler, seth *controllers.SettingsHandler) *gin.Engine {
 	r := gin.Default()
+	
+	// 添加CORS中间件
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	r.Use(cors.New(config))
+	
 	r.LoadHTMLGlob("templates/*")
 	r.Static("/static", "./static")
 
 	// 登录相关路由
 	r.GET("/login", ah.LoginPage)
 	r.GET("/logout", ah.Logout)
-	r.POST("/token-login", ah.TokenLogin)
+	r.POST("/auth/token-login", ah.TokenLogin)
 	r.GET("/auth/github", ah.GitHubLogin)
 	r.GET("/auth/github/callback", ah.GitHubCallback)
 
